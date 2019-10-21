@@ -1,0 +1,36 @@
+- Explain how the ftrace ring buffer works in a few sentences. 
+
+The ftrace ring buffer is a list of pages indexed using a linked list.
+The ring buffer uses four main pointers, the head_page pointer which is the
+pointer to next page that should be read, the tail_page pointer which is the
+pointer to the next page that should be written to, and the commit page which is
+the pointer to the page that was last written to by a non-nested write.
+At initialization, the head_page, tail_page and commit_page all point to the same
+page.
+
+The ring buffer also has a reader_page that is usually only used by the
+reader/consumer (tasks that read from the buffer). At initialization, this page
+is allocated aside from the ring buffer with its next pointer pointing to the
+head page, and its previous pointer pointing to a page before the head page.
+
+During a write to the ring buffer, the next position available for writing is 
+reserved and passed to the producer/writers (tasks that write to the ring buffer). 
+The writer commits the write, when it's done.
+
+During a read from the ring buffer, the reader will swap its page with the
+head_page if its page is empty.
+The previous reader page then becomes part of the ring buffer, and the head_page
+is removed. The page after the newly inserted reader_page becomes the new head_page
+in the ring buffer.
+
+- Explain how and when a trace record in the ring buffer is converted to text when
+/sys/kernel/debug/tracing/trace is read.
+
+The ftrace ring buffer uses a binary format. Each trace event has a format file 
+associated with it containing descriptions of field logged and the format string
+used to print the event in text mode.
+This description is used to parse the binary trace stream during a read of the ring
+buffer.
+The ring buffer also only stores pointers to strings referenced by events and not
+the strings themselves. The strings can be obtained by parsing the printk_format
+file in the trace sysfs directory in order to map the pointer to the actual string.
