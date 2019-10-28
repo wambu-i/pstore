@@ -5,6 +5,13 @@ The ring buffer uses four main pointers, the head_page pointer which is the
 pointer to next page that should be read, the tail_page pointer which is the
 pointer to the next page that should be written to, and the commit page which is
 the pointer to the page that was last written to by a non-nested write.
+A writer in the ring-buffer can interrupt and stop another writer already executing
+its write, but the interrupting writer must finish writing before the interrupted
+writer can continue its execution. In this way, the writers can be "nested" in  a
+hierarchical stack starting with the first writer that was interrupted or preempted.
+The first preempted writer is always the last writer to commit its write. A
+non-nested write it therefore one done by the last writer in the pre-empting
+writer stack.
 At initialization, the head_page, tail_page and commit_page all point to the same
 page.
 
@@ -34,3 +41,26 @@ buffer.
 The ring buffer also only stores pointers to strings referenced by events and not
 the strings themselves. The strings can be obtained by parsing the printk_format
 file in the trace sysfs directory in order to map the pointer to the actual string.
+
+- Say you increase the ftrace buffer size by writing 1024 to maxbuffer_sizekb
+(I forget the actual name of the sysfs file -- find it). How much physical RAM
+ends up being consumed, and what factors does the RAM consumption depend on?
+
+The buffer_size_kb file is used to set or display the size of the trace buffer for
+each CPU. The size written into this file is usually rounded up to the nearest page
+size for allocation.
+The number of pages allocated is limited to the percentage of memory available, and
+requesting too large of a request is usually denied.
+The memory allocation is also influenced by the page size used by the kernel, as memory
+will be allocated in full pages (part of a page cannot be allocation and is instead rounded
+up to a full page).
+
+On a 64-bit system, with a 4kb page size, a buffer size of 1024 will end up using
+4MB of physical RAM.
+
+- Where is the code in the kernel that allocates memory for the ftrace ring
+buffer? Could you point it out?
+
+The buffer's memory is allocated in the __ring_buffer_alloc function in the
+kernel/trace/ring_buffer.c file:
+https://github.com/torvalds/linux/blob/master/kernel/trace/ring_buffer.c#L1376
